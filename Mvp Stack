@@ -1,0 +1,65 @@
+// MIGI MVP Stack - Unified Symbolic AI HUD
+
+// === package.json === { "name": "migi-fixi", "version": "1.0.0", "scripts": { "start": "vite", "dev": "vite", "build": "vite build", "server": "uvicorn server.main:app --reload" }, "dependencies": { "react": "^18.2.0", "react-dom": "^18.2.0", "vite": "^5.0.0" }, "devDependencies": { "@vitejs/plugin-react": "^4.0.0" } }
+
+// === .env === VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key_here
+
+// === vite.config.js === import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react';
+
+export default defineConfig({ plugins: [react()], });
+
+// === index.html ===
+
+<!DOCTYPE html><html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MIGI HUD</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=%VITE_GOOGLE_MAPS_API_KEY%&callback=initMap" async defer></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/App.jsx"></script>
+  </body>
+</html>// === src/App.jsx === import React from 'react'; import TwinViewer from './ui/TwinViewer'; import HUDOverlay from './ui/HUDOverlay';
+
+function App() { return ( <> <TwinViewer /> <HUDOverlay /> </> ); }
+
+export default App;
+
+// === README.md ===
+
+MIGI Fixi.js MVP
+
+This is the starter symbolic AI HUD project for the MIGI system.
+
+Install
+
+npm install
+
+Run Dev Server
+
+npm run dev
+
+Run Python API
+
+npm run server
+
+Deploy Smart Contract
+
+Open contracts/HBC.sol in Remix
+
+Use Injected Web3 + Rinkeby or Sepolia testnet
+
+Deploy & fund address
+
+
+Live Symbolic Command
+
+Use slash commands like /event 💥 or /truth 🌀 in the HUDOverlay UI.
+
+
+---
+
+Powered by 💠 MIGI — Machine International Global Intelligence
+
