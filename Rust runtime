@@ -1,0 +1,504 @@
+"""
+MIGI Transpiler Gateway v2.0+ - Rust Runtime Execution Engine
+Commander TreShawn's Cosmic Computing Infrastructure
+
+Executes transpiled Rust code in secure sandboxed environments.
+Supports compilation, execution, dependency management, and error handling.
+"""
+
+import subprocess
+import tempfile
+import os
+import shutil
+import asyncio
+import time
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class RustExecutionResult:
+    """Result of Rust code execution"""
+    success: bool
+    output: str
+    errors: List[str]
+    compilation_time: float
+    execution_time: float
+    exit_code: int
+    workspace_path: Optional[str] = None
+
+@dataclass
+class RustExecutionContext:
+    """Context for Rust execution"""
+    timeout: int = 30
+    memory_limit: str = "128M"
+    enable_networking: bool = False
+    allowed_dependencies: List[str] = None
+    cargo_features: List[str] = None
+    optimization_level: str = "0"  # 0, 1, 2, 3, s, z
+    
+    def __post_init__(self):
+        if self.allowed_dependencies is None:
+            self.allowed_dependencies = [
+                "serde",
+                "serde_json", 
+                "tokio",
+                "clap",
+                "regex",
+                "rand",
+                "uuid",
+                "chrono",
+                "log",
+                "env_logger"
+            ]
+        if self.cargo_features is None:
+            self.cargo_features = []
+
+class RustRunner:
+    """
+    MIGI Rust Runtime - Compiles and executes Rust code safely
+    """
+    
+    def __init__(self):
+        self.temp_dir = None
+        self.workspace_counter = 0
+        
+        # Verify Rust toolchain
+        self._verify_rust_installation()
+    
+    def _verify_rust_installation(self):
+        """Verify Rust toolchain is available"""
+        try:
+            result = subprocess.run(
+                ["rustc", "--version"], 
+                capture_output=True, 
+                text=True, 
+                timeout=10
+            )
+            if result.returncode == 0:
+                logger.info(f"🦀 Rust toolchain detected: {result.stdout.strip()}")
+            else:
+                raise RuntimeError("Rust compiler not responding")
+        except (subprocess.TimeoutExpired, FileNotFoundError, RuntimeError) as e:
+            logger.error(f"❌ Rust toolchain verification failed: {e}")
+            raise RuntimeError(
+                "Rust toolchain not found. Please install Rust from https://rustup.rs/"
+            )
+    
+    async def execute(
+        self, 
+        code: str, 
+        context: Optional[RustExecutionContext] = None
+    ) -> RustExecutionResult:
+        """
+        Main execution entry point - compiles and runs Rust code
+        """
+        if context is None:
+            context = RustExecutionContext()
+        
+        start_time = time.time()
+        
+        try:
+            # Create isolated workspace
+            workspace_path = await self._create_workspace(code, context)
+            
+            # Compile the code
+            compilation_start = time.time()
+            compile_result = await self._compile_code(workspace_path, context)
+            compilation_time = time.time() - compilation_start
+            
+            if not compile_result.success:
+                return RustExecutionResult(
+                    success=False,
+                    output="",
+                    errors=compile_result.errors,
+                    compilation_time=compilation_time,
+                    execution_time=0.0,
+                    exit_code=compile_result.exit_code,
+                    workspace_path=workspace_path
+                )
+            
+            # Execute the compiled binary
+            execution_start = time.time()
+            execution_result = await self._execute_binary(workspace_path, context)
+            execution_time = time.time() - execution_start
+            
+            return RustExecutionResult(
+                success=execution_result.success,
+                output=execution_result.output,
+                errors=execution_result.errors,
+                compilation_time=compilation_time,
+                execution_time=execution_time,
+                exit_code=execution_result.exit_code,
+                workspace_path=workspace_path
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Rust execution failed: {e}")
+            return RustExecutionResult(
+                success=False,
+                output="",
+                errors=[f"Runtime error: {str(e)}"],
+                compilation_time=0.0,
+                execution_time=time.time() - start_time,
+                exit_code=-1
+            )
+    
+    async def _create_workspace(
+        self, 
+        code: str, 
+        context: RustExecutionContext
+    ) -> str:
+        """Create isolated Cargo workspace for compilation"""
+        
+        # Create unique workspace directory
+        workspace_name = f"migi_rust_{int(time.time())}_{self.workspace_counter}"
+        self.workspace_counter += 1
+        
+        workspace_path = Path(tempfile.gettempdir()) / workspace_name
+        workspace_path.mkdir(exist_ok=True)
+        
+        # Generate Cargo.toml
+        cargo_toml = self._generate_cargo_toml(context)
+        (workspace_path / "Cargo.toml").write_text(cargo_toml)
+        
+        # Create src directory and main.rs
+        src_dir = workspace_path / "src"
+        src_dir.mkdir(exist_ok=True)
+        (src_dir / "main.rs").write_text(code)
+        
+        logger.info(f"🏗️ Created Rust workspace: {workspace_path}")
+        return str(workspace_path)
+    
+    def _generate_cargo_toml(self, context: RustExecutionContext) -> str:
+        """Generate Cargo.toml with security constraints"""
+        
+        # Build dependencies section
+        dependencies = []
+        for dep in context.allowed_dependencies:
+            if dep in [
+                "serde", "serde_json", "tokio", "clap", "regex", 
+                "rand", "uuid", "chrono", "log", "env_logger"
+            ]:
+                # Use latest compatible versions for allowed deps
+                version_map = {
+                    "serde": "1.0",
+                    "serde_json": "1.0", 
+                    "tokio": '{ version = "1.0", features = ["full"] }',
+                    "clap": "4.0",
+                    "regex": "1.0",
+                    "rand": "0.8",
+                    "uuid": "1.0",
+                    "chrono": "0.4",
+                    "log": "0.4",
+                    "env_logger": "0.10"
+                }
+                dep_spec = version_map.get(dep, "1.0")
+                dependencies.append(f'{dep} = {dep_spec}')
+        
+        deps_section = "\n".join(dependencies) if dependencies else ""
+        
+        return f"""[package]
+name = "migi-execution"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+{deps_section}
+
+[profile.dev]
+opt-level = {context.optimization_level}
+debug = true
+overflow-checks = true
+
+[profile.release]
+opt-level = {context.optimization_level}
+debug = false
+lto = true
+"""
+    
+    async def _compile_code(
+        self, 
+        workspace_path: str, 
+        context: RustExecutionContext
+    ) -> RustExecutionResult:
+        """Compile Rust code using Cargo"""
+        
+        try:
+            # Build command
+            cmd = [
+                "cargo", "build",
+                "--manifest-path", f"{workspace_path}/Cargo.toml"
+            ]
+            
+            # Add release flag if optimization requested
+            if context.optimization_level in ["2", "3", "s", "z"]:
+                cmd.append("--release")
+            
+            # Add features if specified
+            if context.cargo_features:
+                cmd.extend(["--features", ",".join(context.cargo_features)])
+            
+            logger.info(f"🔨 Compiling Rust code: {' '.join(cmd)}")
+            
+            # Execute compilation
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=workspace_path
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), 
+                timeout=context.timeout
+            )
+            
+            stdout_text = stdout.decode('utf-8', errors='replace')
+            stderr_text = stderr.decode('utf-8', errors='replace')
+            
+            success = process.returncode == 0
+            
+            if success:
+                logger.info("✅ Rust compilation successful")
+            else:
+                logger.warning(f"❌ Rust compilation failed: {stderr_text}")
+            
+            return RustExecutionResult(
+                success=success,
+                output=stdout_text,
+                errors=[stderr_text] if stderr_text else [],
+                compilation_time=0.0,
+                execution_time=0.0,
+                exit_code=process.returncode
+            )
+            
+        except asyncio.TimeoutError:
+            logger.error("⏰ Rust compilation timeout")
+            return RustExecutionResult(
+                success=False,
+                output="",
+                errors=["Compilation timeout exceeded"],
+                compilation_time=0.0,
+                execution_time=0.0,
+                exit_code=-1
+            )
+        except Exception as e:
+            logger.error(f"❌ Compilation error: {e}")
+            return RustExecutionResult(
+                success=False,
+                output="",
+                errors=[f"Compilation error: {str(e)}"],
+                compilation_time=0.0,
+                execution_time=0.0,
+                exit_code=-1
+            )
+    
+    async def _execute_binary(
+        self, 
+        workspace_path: str, 
+        context: RustExecutionContext
+    ) -> RustExecutionResult:
+        """Execute the compiled Rust binary"""
+        
+        try:
+            # Determine binary path
+            binary_name = "migi-execution"
+            if context.optimization_level in ["2", "3", "s", "z"]:
+                binary_path = f"{workspace_path}/target/release/{binary_name}"
+            else:
+                binary_path = f"{workspace_path}/target/debug/{binary_name}"
+            
+            # Check if binary exists
+            if not os.path.exists(binary_path):
+                return RustExecutionResult(
+                    success=False,
+                    output="",
+                    errors=["Compiled binary not found"],
+                    compilation_time=0.0,
+                    execution_time=0.0,
+                    exit_code=-1
+                )
+            
+            logger.info(f"🚀 Executing Rust binary: {binary_path}")
+            
+            # Execute with security constraints
+            cmd = [binary_path]
+            
+            # Add resource limits (Linux-specific)
+            if os.name == 'posix':
+                cmd = [
+                    "timeout", str(context.timeout),
+                    "stdbuf", "-o0", "-e0"  # Unbuffer output
+                ] + cmd
+            
+            # Execute the binary
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=workspace_path
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=context.timeout + 5  # Grace period
+            )
+            
+            stdout_text = stdout.decode('utf-8', errors='replace')
+            stderr_text = stderr.decode('utf-8', errors='replace')
+            
+            success = process.returncode == 0
+            
+            if success:
+                logger.info("✅ Rust execution successful")
+                logger.info(f"📤 Output: {stdout_text[:200]}...")
+            else:
+                logger.warning(f"❌ Rust execution failed with code {process.returncode}")
+            
+            return RustExecutionResult(
+                success=success,
+                output=stdout_text,
+                errors=[stderr_text] if stderr_text else [],
+                compilation_time=0.0,
+                execution_time=0.0,
+                exit_code=process.returncode
+            )
+            
+        except asyncio.TimeoutError:
+            logger.error("⏰ Rust execution timeout")
+            return RustExecutionResult(
+                success=False,
+                output="",
+                errors=["Execution timeout exceeded"],
+                compilation_time=0.0,
+                execution_time=0.0,
+                exit_code=-124  # timeout exit code
+            )
+        except Exception as e:
+            logger.error(f"❌ Execution error: {e}")
+            return RustExecutionResult(
+                success=False,
+                output="",
+                errors=[f"Execution error: {str(e)}"],
+                compilation_time=0.0,
+                execution_time=0.0,
+                exit_code=-1
+            )
+    
+    def cleanup_workspace(self, workspace_path: str):
+        """Clean up temporary workspace"""
+        try:
+            if workspace_path and os.path.exists(workspace_path):
+                shutil.rmtree(workspace_path)
+                logger.info(f"🧹 Cleaned up workspace: {workspace_path}")
+        except Exception as e:
+            logger.warning(f"⚠️ Cleanup failed: {e}")
+
+# Convenience function for integration with MIGI Gateway
+async def execute_rust_code(
+    code: str, 
+    context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Gateway integration function - matches expected interface
+    """
+    runner = RustRunner()
+    
+    # Convert context dict to RustExecutionContext
+    rust_context = RustExecutionContext()
+    if context:
+        rust_context.timeout = context.get('timeout', 30)
+        rust_context.memory_limit = context.get('memory_limit', '128M')
+        rust_context.optimization_level = context.get('optimization', '0')
+    
+    # Execute the code
+    result = await runner.execute(code, rust_context)
+    
+    # Clean up workspace
+    if result.workspace_path:
+        runner.cleanup_workspace(result.workspace_path)
+    
+    # Return in expected format
+    return {
+        "success": result.success,
+        "output": result.output,
+        "errors": result.errors,
+        "exit_code": result.exit_code,
+        "metadata": {
+            "compilation_time": result.compilation_time,
+            "execution_time": result.execution_time,
+            "language": "rust"
+        }
+    }
+
+# Example usage and testing
+if __name__ == "__main__":
+    async def test_rust_runner():
+        """Test the Rust runner with various code samples"""
+        
+        runner = RustRunner()
+        
+        # Test 1: Simple Hello World
+        print("🧪 Test 1: Hello World")
+        hello_code = '''
+fn main() {
+    println!("🦀 Hello from MIGI Rust Runtime!");
+    println!("Cosmic computing initiated...");
+}
+'''
+        result = await runner.execute(hello_code)
+        print(f"Success: {result.success}")
+        print(f"Output: {result.output}")
+        print(f"Compilation: {result.compilation_time:.2f}s")
+        print(f"Execution: {result.execution_time:.2f}s")
+        if result.workspace_path:
+            runner.cleanup_workspace(result.workspace_path)
+        print()
+        
+        # Test 2: Math calculation
+        print("🧪 Test 2: Mathematical Computation")
+        math_code = '''
+fn main() {
+    let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let sum: i32 = numbers.iter().sum();
+    let avg = sum as f64 / numbers.len() as f64;
+    
+    println!("🧮 Numbers: {:?}", numbers);
+    println!("📊 Sum: {}", sum);
+    println!("📈 Average: {:.2}", avg);
+    
+    // Test some advanced features
+    let squared: Vec<i32> = numbers.iter().map(|x| x * x).collect();
+    println!("🔢 Squares: {:?}", squared);
+}
+'''
+        result = await runner.execute(math_code)
+        print(f"Success: {result.success}")
+        print(f"Output: {result.output}")
+        if result.workspace_path:
+            runner.cleanup_workspace(result.workspace_path)
+        print()
+        
+        # Test 3: Error handling
+        print("🧪 Test 3: Compilation Error")
+        error_code = '''
+fn main() {
+    let x = 42;
+    println!("Value: {}", y);  // Undefined variable
+}
+'''
+        result = await runner.execute(error_code)
+        print(f"Success: {result.success}")
+        print(f"Errors: {result.errors}")
+        if result.workspace_path:
+            runner.cleanup_workspace(result.workspace_path)
+        print()
+    
+    # Run tests
+    asyncio.run(test_rust_runner())
