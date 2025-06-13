@@ -1,0 +1,68 @@
+migi/
+├─ README.md
+├─ .gitignore
+├─ .github/            ← CI workflows (SBOM, tests, lint, build)
+│
+├─ toolchain/          ← reproducible builds (fnm-rc, rust-toolchain.toml, etc.)
+│
+├─ apps/               ← runnable top-level “products”
+│  ├─ dashboard/       ← Astro 5 + Svelte 5 + Three.js UI
+│  ├─ xr-panel/        ← WebXR / Unity or PlayCanvas viewer
+│  ├─ mobile/          ← React-Native or Tauri desktop shell
+│  └─ cli/             ← Rust + Python hybrid CLI for Emoji A++
+│
+├─ packages/           ← shared libraries, each language isolated
+│  ├─ emoji-runtime/   ← Python Emoji A++ parser & executor
+│  ├─ migi-core/       ← Rust crate (task scheduler, message bus)
+│  ├─ hydra-db/        ← SurrealDB schema + Drizzle ORM models
+│  ├─ ai-models/       ← JAX / TF / Torch models + weights
+│  ├─ sdn-bio/         ← Ryu controller + P4 program + CUDA EPU
+│  ├─ kernel/          ← leviathan/boot (ASM), leviathan/core (C, Rust)
+│  └─ wasm-bridge/     ← Zig/Haskell → WebAssembly function bridge
+│
+├─ infra/              ← IaC & ops
+│  ├─ kubernetes/      ← Helm charts, Kustomize overlays
+│  ├─ terraform/       ← multi-cloud GPU / QPU infra
+│  └─ eBPF/            ← compiled probes, ZeroSync routes
+│
+├─ docs/               ← spec, ADRs, AI-governance, architecture diagrams
+│  ├─ api/             ← OpenAPI + GraphQL schema
+│  ├─ model-cards/
+│  └─ sbom/            ← SPDX / CycloneDX outputs
+│
+└─ scripts/            ← dev helper scripts (bootstrap, lint-all, release)
+# packages/emoji-runtime/handlers/idea.py
+from migi_core.client import submit_job
+
+def handle_idea(content: str):
+    job_id = submit_job(
+        namespace="creative",
+        payload={"prompt": content, "mode": "gpu-remix"},
+        tags=["💡", "🎨"]
+    )
+    # once GPU render done, migi-core will call blockchain logger
+    return f"[IDEATION] submitted GPU remix job {job_id}"
+// packages/migi-core/src/scheduler.rs
+fn handle_gpu_remix(payload: Payload) -> anyhow::Result<()> {
+    let scene = gpu::remix(&payload.prompt)?;
+    blockchain::log(scene.hash())?;       // calls SurrealQL OR smart-contract
+    Ok(())
+}
+name: build
+on: [push, pull_request]
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lang: [node, rust, python]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-${{ matrix.lang }}
+      - run: task test
+  sbom-sign:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: task release
