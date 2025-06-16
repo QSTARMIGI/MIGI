@@ -1,0 +1,24 @@
+MIGI/
+├── .github/
+│   └── workflows/
+│       └── build.yml              # GitHub Actions CI script
+├── src/
+│   ├── core/                      # CPU, symbolic core logic
+│   │   └── migi_main.rs
+│   ├── ai/
+│   │   └── npu_core.rs
+│   ├── quantum/
+│   │   └── qdot_sim.py
+│   ├── vision/
+│   │   └── gan_tpu.cpp
+│   ├── ui/
+│   │   └── vr_world.tsx
+│   └── symbols/
+│       └── emoji_vm.rs
+├── integrations/
+│   └── hbc_chain.sol             # HBC smart contract
+├── MIGI.build.json               # Unified build config
+├── MIGI.pdb                      # Program database output (symbol map)
+├── README.md
+├── LICENSE
+└── .gitignore
