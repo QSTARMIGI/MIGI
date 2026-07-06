@@ -1,0 +1,85 @@
+registry_version: 1
+purpose: >
+  Track external technology used, evaluated, mirrored, or integrated by the MIGI portfolio.
+  This registry records relationship and provenance status; it does not grant rights beyond upstream licenses.
+entries:
+  - id: llama_cpp
+    relationship: integration_candidate
+    repository: QSTARMIGI/migi-project
+    upstream: ggml-org/llama.cpp
+    use_case: local and edge language-model inference evaluation
+    provenance_status: upstream_derived
+    version_policy: pin a reviewed tag or commit before product integration
+    license_status: verify against the selected upstream revision before redistribution
+  - id: android_platform
+    relationship: platform_dependency
+    repository: QSTARMIGI/MIGI
+    upstream: Android SDK and Android platform APIs
+    use_case: MIRROR SEED mobile edge runtime
+    provenance_status: upstream_dependency
+    version_policy: record compile SDK, target SDK, and library versions in the Android module
+    license_status: platform and library terms apply
+  - id: camera_x
+    relationship: platform_dependency
+    repository: QSTARMIGI/MIGI
+    upstream: AndroidX CameraX
+    use_case: authorized image and video capture
+    provenance_status: upstream_dependency
+    version_policy: pin reviewed version in Gradle catalog
+    license_status: verify before inclusion
+  - id: kotlin
+    relationship: platform_dependency
+    repository: QSTARMIGI/MIGI
+    upstream: Kotlin language and toolchain
+    use_case: Android client and service implementation
+    provenance_status: upstream_dependency
+    version_policy: pin reviewed compiler and plugin versions
+    license_status: verify before inclusion
+  - id: sqlite
+    relationship: platform_dependency
+    repository: QSTARMIGI/MIGI
+    upstream: SQLite
+    use_case: local ChainLog and receipt persistence
+    provenance_status: upstream_dependency
+    version_policy: document platform package or bundled version
+    license_status: public-domain upstream distribution; verify bundled components
+  - id: surrealdb
+    relationship: reference_mirror_or_evaluation
+    repository: QSTARMIGI/surrealdb
+    upstream: surrealdb/surrealdb
+    use_case: graph-like projections and future relationship storage evaluation
+    provenance_status: upstream_mirror
+    version_policy: do not couple canonical schemas to it until selected
+    license_status: verify against the selected upstream revision
+  - id: opencv
+    relationship: reference_mirror_or_evaluation
+    repository: QSTARMIGI/opencv
+    upstream: opencv/opencv
+    use_case: computer vision evaluation
+    provenance_status: upstream_mirror
+    version_policy: use pinned releases for any product integration
+    license_status: verify against the selected upstream revision
+  - id: jax
+    relationship: reference_mirror_or_evaluation
+    repository: QSTARMIGI/jax
+    upstream: jax-ml/jax
+    use_case: numerical and simulation research
+    provenance_status: upstream_mirror
+    version_policy: isolate behind a simulation adapter
+    license_status: verify against the selected upstream revision
+  - id: react
+    relationship: reference_mirror_or_evaluation
+    repository: QSTARMIGI/react
+    upstream: facebook/react
+    use_case: web interface evaluation
+    provenance_status: upstream_mirror
+    version_policy: select through an interface-specific dependency manifest
+    license_status: verify against the selected upstream revision
+  - id: tauri
+    relationship: reference_mirror_or_evaluation
+    repository: QSTARMIGI/tauri
+    upstream: tauri-apps/tauri
+    use_case: desktop client evaluation
+    provenance_status: upstream_mirror
+    version_policy: use only through a scoped desktop satellite project
+    license_status: verify against the selected upstream revision
