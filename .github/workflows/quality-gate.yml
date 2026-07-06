@@ -1,0 +1,33 @@
+name: MIGI Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required files
+        run: |
+          test -f README.md
+          test -f LICENSE
+          test -f CONTRIBUTING.md
+          test -f SECURITY.md
+          test -f docs/architecture/internal-operating-projects.md
+          test -f docs/architecture/repository-roles.md
+          test -f docs/roadmap/mirror-seed-mvp.md
+          test -f docs/adr/README.md
+          test -f provenance/dependencies.yaml
+          test -f schemas/muef-event.v0.json
+          test -f schemas/migi-receipt.v0.json
+      - name: Validate JSON schemas parse
+        run: |
+          python3 -m json.tool schemas/muef-event.v0.json >/dev/null
+          python3 -m json.tool schemas/migi-receipt.v0.json >/dev/null
