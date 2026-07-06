@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSTARMIGI/MIGI/schemas/migi-receipt.v0.json",
+  "title": "MIGIReceipt v0",
+  "description": "Documentation-level provenance and authority record for a durable MIGI state transition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "issued_at",
+    "event_id",
+    "source_class",
+    "intent_ref",
+    "output_ref",
+    "previous_receipt_ref",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "migi-receipt.v0"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_class": {
+      "enum": [
+        "original",
+        "observed",
+        "derived",
+        "simulated",
+        "proposed",
+        "authorized",
+        "executed"
+      ]
+    },
+    "intent_ref": {
+      "type": "string"
+    },
+    "output_ref": {
+      "type": "string"
+    },
+    "previous_receipt_ref": {
+      "type": "string"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tre_logic", "reason_code"],
+      "properties": {
+        "tre_logic": {
+          "enum": ["+1", "0", "-1"]
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consent_scope": {
+          "type": "string"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Non-secret operational metadata."
+    }
+  }
+}
