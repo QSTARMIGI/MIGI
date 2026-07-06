@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSTARMIGI/MIGI/schemas/muef-event.v0.json",
+  "title": "MUEF Event v0",
+  "description": "Versioned envelope for MIGI Unified Event Framework events.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "actor",
+    "source_class",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "muef.v0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Globally unique event identifier."
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "description": "Namespaced event type such as asset.capture.created."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "enum": ["user", "agent", "service", "device", "organization"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source_class": {
+      "enum": [
+        "original",
+        "observed",
+        "derived",
+        "simulated",
+        "proposed",
+        "authorized",
+        "executed"
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tre_logic": {
+          "enum": ["+1", "0", "-1"]
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "consent_scope": {
+          "type": "string"
+        },
+        "receipt_id": {
+          "type": "string"
+        }
+      }
+    },
+    "parent_event_id": {
+      "type": "string"
+    },
+    "receipt_id": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific data. Avoid secrets and unnecessary personal data."
+    }
+  }
+}
