@@ -20,14 +20,22 @@ jobs:
           test -f LICENSE
           test -f CONTRIBUTING.md
           test -f SECURITY.md
+          test -f Cargo.toml
           test -f docs/architecture/internal-operating-projects.md
           test -f docs/architecture/repository-roles.md
           test -f docs/roadmap/mirror-seed-mvp.md
           test -f docs/adr/README.md
           test -f provenance/dependencies.yaml
+          test -f provenance/code-formats.yaml
           test -f schemas/muef-event.v0.json
           test -f schemas/migi-receipt.v0.json
+          test -f schemas/migi-code-artifact.v0.json
+          test -f crates/migi-core/Cargo.toml
+          test -f crates/migi-recall/Cargo.toml
       - name: Validate JSON schemas parse
         run: |
           python3 -m json.tool schemas/muef-event.v0.json >/dev/null
           python3 -m json.tool schemas/migi-receipt.v0.json >/dev/null
+          python3 -m json.tool schemas/migi-code-artifact.v0.json >/dev/null
+      - name: Run Rust workspace tests
+        run: cargo test --workspace --all-targets
