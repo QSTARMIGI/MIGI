@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - name: Check required files
         run: |
           test -f README.md
@@ -22,12 +25,19 @@ jobs:
           test -f SECURITY.md
           test -f docs/architecture/internal-operating-projects.md
           test -f docs/architecture/repository-roles.md
+          test -f docs/architecture/genesis-node-v0.1.md
           test -f docs/roadmap/mirror-seed-mvp.md
           test -f docs/adr/README.md
           test -f provenance/dependencies.yaml
           test -f schemas/muef-event.v0.json
           test -f schemas/migi-receipt.v0.json
+          test -f pyproject.toml
+          test -f migi/genesis.py
+          test -f tests/test_genesis.py
       - name: Validate JSON schemas parse
         run: |
-          python3 -m json.tool schemas/muef-event.v0.json >/dev/null
-          python3 -m json.tool schemas/migi-receipt.v0.json >/dev/null
+          python -m json.tool schemas/muef-event.v0.json >/dev/null
+          python -m json.tool schemas/migi-receipt.v0.json >/dev/null
+      - name: Run Genesis Node tests
+        run: |
+          PYTHONPATH=. python -W error::ResourceWarning -m unittest discover -s tests -v

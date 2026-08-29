@@ -6,7 +6,7 @@
 
 ## Current Focus
 
-MIGI is in an architecture-and-MVP implementation phase. The first practical product path is **MIRROR SEED**: trusted mobile capture, local provenance, explainable analysis, human approval, and a replayable receipt trail.
+MIGI is in an architecture-and-MVP implementation phase. The executable core now starts with **Genesis Node v0.1**, which proves intent → authority → execution → verification → receipt → memory → recall. The first practical product path remains **MIRROR SEED**: trusted mobile capture, local provenance, explainable analysis, human approval, and a replayable receipt trail.
 
 MIGI is designed as a modular system rather than a single model or platform:
 
@@ -34,7 +34,7 @@ Receipt + Audit Trail
 |---|---|
 | **MIGI Kernel** | Coordinates intents, policy checks, task routing, and state updates. |
 | **MUEF** | MIGI Unified Event Framework; a shared event envelope across services and industry adapters. |
-| **MIGIReceipt** | Signed provenance object for captures, transformations, decisions, and actions. |
+| **MIGIReceipt** | Provenance object for captures, transformations, decisions, and actions; key-backed signing is layered on when available. |
 | **ChainLog** | Append-only lineage trail linking receipts and state transitions. |
 | **LUFITGuard** | Consent, scope, risk, budget, and tool-permission policy gate. |
 | **Tre Logic** | Explainable `+1 / 0 / -1` authorization state: proceed, hold, or deny. |
@@ -46,6 +46,7 @@ Receipt + Audit Trail
 ## Architecture Documentation
 
 - [Internal Operating Projects](docs/architecture/internal-operating-projects.md)
+- [Genesis Node v0.1](docs/architecture/genesis-node-v0.1.md)
 - [Repository Roles and Source Provenance](docs/architecture/repository-roles.md)
 - [MIRROR SEED MVP Backlog](docs/roadmap/mirror-seed-mvp.md)
 
@@ -79,6 +80,33 @@ Label output as derived or simulated
   ↓
 Show history and request human approval before consequential action
 ```
+
+## Genesis Node v0.1
+
+The first executable vertical slice lives in `migi/` and uses SQLite for durable local state. Core CLI operation requires only the Python standard library.
+
+```bash
+python -m migi.cli --db .migi/genesis.db inspect ./README.md
+python -m migi.cli --db .migi/genesis.db verify
+python -m migi.cli --db .migi/genesis.db recall README.md
+```
+
+The optional FastAPI surface matches the planned kernel boundary:
+
+```text
+GET  /status
+POST /execute
+GET  /receipts
+GET  /recall/{reference}
+```
+
+Run the acceptance suite with:
+
+```bash
+PYTHONPATH=. python -m unittest discover -s tests -v
+```
+
+Genesis v0.1 provides SHA-256 hash-chain integrity. Device identity signatures are deliberately deferred to the Android Keystore-backed MIRROR SEED milestone rather than being implied by the current code.
 
 ## Repository Status
 
