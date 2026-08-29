@@ -34,7 +34,7 @@ Receipt + Audit Trail
 |---|---|
 | **MIGI Kernel** | Coordinates intents, policy checks, task routing, and state updates. |
 | **MUEF** | MIGI Unified Event Framework; a shared event envelope across services and industry adapters. |
-| **MIGIReceipt** | Signed provenance object for captures, transformations, decisions, and actions. |
+| **MIGIReceipt** | Provenance object for captures, transformations, decisions, and actions; key-backed signing is layered on when available. |
 | **ChainLog** | Append-only lineage trail linking receipts and state transitions. |
 | **LUFITGuard** | Consent, scope, risk, budget, and tool-permission policy gate. |
 | **Tre Logic** | Explainable `+1 / 0 / -1` authorization state: proceed, hold, or deny. |
