@@ -22,6 +22,7 @@ pub struct Actor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 pub enum SourceClass {
     Original,
     Observed,
@@ -95,26 +96,31 @@ pub struct MigiReceipt {
     pub output_ref: String,
     pub previous_receipt_ref: String,
     pub authority: Authority,
-    pub input_hash: String,
-    pub output_hash: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub metadata: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Error)]
 pub enum CoreError {
     #[error("event schema_version must be muef.v0")]
     InvalidSchemaVersion,
-    #[error("event_type must be namespaced, e.g. migi.signal.test")]
+    #[error("event_type must match the lowercase namespaced MUEF form, e.g. migi.signal.test")]
     InvalidEventType,
-    #[error("event payload must be an object")]
-    InvalidPayload,
 }
 
 pub fn validate_event(event: &MuefEvent) -> Result<(), CoreError> {
     if event.schema_version != "muef.v0" {
         return Err(CoreError::InvalidSchemaVersion);
     }
+
+    let valid_segment = |segment: &str| {
+        let mut chars = segment.chars();
+        matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
+            && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    };
+
     let parts: Vec<&str> = event.event_type.split('.').collect();
-    if parts.len() < 2 || parts.iter().any(|p| p.is_empty() || !p.chars().next().unwrap().is_ascii_lowercase()) {
+    if parts.len() < 2 || parts.iter().any(|part| !valid_segment(part)) {
         return Err(CoreError::InvalidEventType);
     }
     Ok(())
@@ -135,6 +141,10 @@ pub fn issue_receipt(
     validate_event(event)?;
     let input_hash = sha256_json(event);
     let output_hash = sha256_json(output);
+    let mut metadata = serde_json::Map::new();
+    metadata.insert("input_hash".into(), serde_json::Value::String(input_hash));
+    metadata.insert("output_hash".into(), serde_json::Value::String(output_hash.clone()));
+
     Ok(MigiReceipt {
         schema_version: "migi-receipt.v0".into(),
         receipt_id: Uuid::new_v4().to_string(),
@@ -142,11 +152,10 @@ pub fn issue_receipt(
         event_id: event.event_id.clone(),
         source_class: SourceClass::Executed,
         intent_ref: event.event_id.clone(),
-        output_ref: output_hash.clone(),
+        output_ref: output_hash,
         previous_receipt_ref: previous_receipt_ref.into(),
         authority,
-        input_hash,
-        output_hash,
+        metadata,
     })
 }
 
@@ -165,14 +174,20 @@ mod tests {
     }
 
     #[test]
+    fn source_class_serializes_like_the_json_schema() {
+        assert_eq!(serde_json::to_string(&SourceClass::Original).unwrap(), "\"original\"");
+        assert_eq!(serde_json::to_string(&SourceClass::Executed).unwrap(), "\"executed\"");
+    }
+
+    #[test]
     fn receipt_chains_event_and_hashes_output() {
         let event = MuefEvent::new("migi.signal.test", actor(), SourceClass::Original);
         let authority = Authority { tre_logic: TreLogic::Proceed, reason_code: "test_allowed".into(), consent_scope: None };
         let output = serde_json::json!({"message": "hello"});
         let receipt = issue_receipt(&event, authority, &output, "genesis").unwrap();
         assert_eq!(receipt.event_id, event.event_id);
-        assert!(receipt.input_hash.starts_with("sha256:"));
-        assert!(receipt.output_hash.starts_with("sha256:"));
+        assert!(receipt.output_ref.starts_with("sha256:"));
+        assert!(receipt.metadata["input_hash"].as_str().unwrap().starts_with("sha256:"));
         assert_eq!(receipt.previous_receipt_ref, "genesis");
     }
 
