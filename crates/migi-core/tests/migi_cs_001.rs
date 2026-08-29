@@ -18,6 +18,7 @@ fn verifiable_signal_loop() {
 
     assert_eq!(receipt.event_id, event.event_id);
     assert_eq!(receipt.previous_receipt_ref, "genesis");
-    assert!(receipt.input_hash.starts_with("sha256:"));
-    assert!(receipt.output_hash.starts_with("sha256:"));
+    assert!(receipt.output_ref.starts_with("sha256:"));
+    assert!(receipt.metadata["input_hash"].as_str().unwrap().starts_with("sha256:"));
+    assert!(receipt.metadata["output_hash"].as_str().unwrap().starts_with("sha256:"));
 }
