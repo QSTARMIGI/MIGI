@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -79,6 +82,33 @@ class GenesisNodeTests(unittest.TestCase):
             verification = node.store.verify_chain()
             self.assertTrue(verification["valid"])
             self.assertEqual(verification["checked"], 2)
+
+    def test_receipt_tampering_is_detected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "evidence.txt"
+            target.write_text("original evidence", encoding="utf-8")
+            db_path = root / "genesis.db"
+            node = GenesisNode(db_path, allowed_roots=[root])
+
+            node.inspect_artifact(target)
+            self.assertTrue(node.store.verify_chain()["valid"])
+
+            with closing(sqlite3.connect(db_path)) as conn:
+                with conn:
+                    row = conn.execute(
+                        "SELECT sequence, payload_json FROM receipt_chain ORDER BY sequence LIMIT 1"
+                    ).fetchone()
+                    payload = json.loads(row[1])
+                    payload["metadata"]["verified"] = False
+                    conn.execute(
+                        "UPDATE receipt_chain SET payload_json = ? WHERE sequence = ?",
+                        (json.dumps(payload, sort_keys=True, separators=(",", ":")), row[0]),
+                    )
+
+            verification = node.store.verify_chain()
+            self.assertFalse(verification["valid"])
+            self.assertEqual(verification["reason"], "receipt_hash_mismatch")
 
 
 if __name__ == "__main__":
