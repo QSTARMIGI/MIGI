@@ -85,12 +85,14 @@ impl CodeArtifact {
         status: ArtifactStatus,
     ) -> Self {
         let content = content.into();
+        let language = language.into();
+        let format = format.into();
         Self {
             schema_version: CODE_ARTIFACT_SCHEMA.into(),
             artifact_id: Uuid::new_v4().to_string(),
             title: title.into(),
-            language: normalize_id(&language.into()),
-            format: normalize_id(&format.into()),
+            language: normalize_id(&language),
+            format: normalize_id(&format),
             content_hash: sha256_text(&content),
             content,
             source,
@@ -186,7 +188,7 @@ impl RecallIndex {
                     && (query.source_kinds.is_empty() || query.source_kinds.contains(&artifact.source.kind))
                     && (system_filters.is_empty()
                         || system_filters.iter().any(|wanted| {
-                            artifact.named_systems.iter().any(|s| s.to_ascii_lowercase() == *wanted)
+                            artifact.named_systems.iter().any(|s| s.eq_ignore_ascii_case(wanted))
                         }))
             })
             .filter_map(|artifact| {
@@ -245,6 +247,8 @@ impl RecallIndex {
 pub enum RecallError {
     #[error("unsupported code artifact schema: {0}")]
     UnsupportedSchema(String),
+    #[error("required artifact field is empty: {0}")]
+    EmptyField(&'static str),
     #[error("artifact content hash does not match content for {0}")]
     HashMismatch(String),
     #[error("I/O error: {0}")]
@@ -258,6 +262,17 @@ pub enum RecallError {
 pub fn validate_artifact(artifact: &CodeArtifact) -> Result<(), RecallError> {
     if artifact.schema_version != CODE_ARTIFACT_SCHEMA {
         return Err(RecallError::UnsupportedSchema(artifact.schema_version.clone()));
+    }
+    for (name, value) in [
+        ("artifact_id", artifact.artifact_id.as_str()),
+        ("title", artifact.title.as_str()),
+        ("language", artifact.language.as_str()),
+        ("format", artifact.format.as_str()),
+        ("source.uri", artifact.source.uri.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(RecallError::EmptyField(name));
+        }
     }
     if !artifact.verify_hash() {
         return Err(RecallError::HashMismatch(artifact.artifact_id.clone()));
