@@ -1,0 +1,177 @@
+registry_version: 1
+purpose: >
+  Canonical vocabulary for indexing historical MIGI/Mogo-Lab code through RAG0SHOT.
+  Recall is allowed for every listed format. Execution is separate and requires an
+  approved runtime adapter, authority decision, and receipt.
+
+languages:
+  - id: rust
+    kind: source
+    recall: true
+    execution_adapter: rust-cargo
+    execution_status: prototype
+  - id: python
+    kind: source
+    recall: true
+    execution_adapter: python
+    execution_status: prototype
+  - id: c
+    kind: source
+    recall: true
+    execution_adapter: native-c
+    execution_status: planned
+  - id: cpp
+    aliases: [c++]
+    kind: source
+    recall: true
+    execution_adapter: native-cpp
+    execution_status: planned
+  - id: kotlin
+    kind: source
+    recall: true
+    execution_adapter: android-gradle
+    execution_status: planned
+  - id: java
+    kind: source
+    recall: true
+    execution_adapter: jvm
+    execution_status: planned
+  - id: typescript
+    aliases: [ts]
+    kind: source
+    recall: true
+    execution_adapter: node
+    execution_status: planned
+  - id: javascript
+    aliases: [js, web3.js]
+    kind: source
+    recall: true
+    execution_adapter: node-or-browser
+    execution_status: planned
+  - id: csharp
+    aliases: [c#]
+    kind: source
+    recall: true
+    execution_adapter: dotnet-or-unity
+    execution_status: planned
+  - id: solidity
+    kind: source
+    recall: true
+    execution_adapter: evm-toolchain
+    execution_status: research
+  - id: sql
+    kind: query
+    recall: true
+    execution_adapter: database
+    execution_status: planned
+  - id: cobol
+    kind: source
+    recall: true
+    execution_adapter: cobol
+    execution_status: research
+  - id: fortran
+    kind: source
+    recall: true
+    execution_adapter: fortran
+    execution_status: research
+  - id: haskell
+    kind: source
+    recall: true
+    execution_adapter: haskell
+    execution_status: research
+  - id: ruby
+    aliases: [ruby-on-rails]
+    kind: source
+    recall: true
+    execution_adapter: ruby
+    execution_status: research
+  - id: shell
+    aliases: [bash, sh]
+    kind: source
+    recall: true
+    execution_adapter: shell
+    execution_status: restricted
+  - id: html
+    kind: source
+    recall: true
+    execution_adapter: browser
+    execution_status: planned
+  - id: css
+    kind: source
+    recall: true
+    execution_adapter: browser
+    execution_status: planned
+  - id: json
+    kind: data
+    recall: true
+    execution_adapter: null
+    execution_status: not_applicable
+  - id: json-schema
+    kind: schema
+    recall: true
+    execution_adapter: schema-validator
+    execution_status: active
+  - id: yaml
+    kind: config
+    recall: true
+    execution_adapter: null
+    execution_status: not_applicable
+  - id: toml
+    kind: config
+    recall: true
+    execution_adapter: null
+    execution_status: not_applicable
+  - id: markdown
+    aliases: [md]
+    kind: documentation
+    recall: true
+    execution_adapter: null
+    execution_status: not_applicable
+  - id: emoji-a++
+    aliases: [emoji-ascii++]
+    kind: workflow
+    recall: true
+    execution_adapter: alchemy-compiler
+    execution_status: research
+  - id: tre-logic
+    kind: workflow
+    recall: true
+    execution_adapter: tre-rule-engine
+    execution_status: prototype
+  - id: plank
+    kind: source
+    recall: true
+    execution_adapter: null
+    execution_status: research
+
+technology_tags:
+  - fastapi
+  - flask
+  - asgi
+  - grpc
+  - websocket
+  - react
+  - vite
+  - astro
+  - three.js
+  - webxr
+  - qiskit
+  - vulkan
+  - android-ndk
+  - jni
+  - camerax
+  - docker
+  - sqlite
+  - surrealdb
+  - ipfs
+  - tensorflow-lite
+  - onnx
+  - cuda
+
+policy:
+  recall_and_execution_are_separate: true
+  preserve_original_content: true
+  hash_every_artifact: true
+  require_source_reference: true
+  require_authority_before_execution: true
+  require_receipt_for_execution: true
