@@ -1,3 +1,6 @@
 [workspace]
-members = ["crates/migi-core"]
+members = [
+    "crates/migi-core",
+    "crates/migi-recall",
+]
 resolver = "2"
