@@ -71,9 +71,6 @@ pub fn encode_packet(packet: &SymbolPacket) -> Result<Vec<u8>, CambusError> {
     if packet.protocol_version != CAMBUS_PROTOCOL_VERSION {
         return Err(CambusError::UnsupportedVersion(packet.protocol_version.clone()));
     }
-    if packet.qos.priority > 255 {
-        return Err(CambusError::InvalidPriority(packet.qos.priority));
-    }
     Ok(serde_json::to_vec(packet)?)
 }
 
@@ -136,8 +133,6 @@ pub enum CambusError {
     UnsupportedVersion(String),
     #[error("CAMbus frame exceeds maximum size: {0} bytes")]
     FrameTooLarge(usize),
-    #[error("invalid QoS priority: {0}")]
-    InvalidPriority(u8),
 }
 
 #[cfg(test)]
