@@ -2,5 +2,7 @@
 members = [
     "crates/migi-core",
     "crates/migi-recall",
+    "crates/migi-chainlog",
+    "crates/migi-cambus",
 ]
 resolver = "2"
