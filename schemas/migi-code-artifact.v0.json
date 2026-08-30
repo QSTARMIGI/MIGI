@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSTARMIGI/MIGI/schemas/migi-code-artifact.v0.json",
+  "title": "MIGI Code Artifact v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","artifact_id","title","language","format","content","source","status","created_at","content_hash"],
+  "properties": {
+    "schema_version": {"const": "migi-code-artifact.v0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "minLength": 1},
+    "format": {"type": "string", "minLength": 1},
+    "content": {"type": "string"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "uri"],
+      "properties": {
+        "kind": {"enum": ["chat","log","repository","file","generated","external"]},
+        "uri": {"type": "string", "minLength": 1},
+        "path": {"type": "string"},
+        "revision": {"type": "string"},
+        "conversation_id": {"type": "string"},
+        "message_id": {"type": "string"}
+      }
+    },
+    "status": {"enum": ["concept","specification","prototype","executable","tested","deprecated"]},
+    "named_systems": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "symbols": {"type": "array", "items": {"type": "string"}},
+    "runtime_adapter": {"type": "string"},
+    "parent_artifact_id": {"type": "string"},
+    "receipt_id": {"type": "string"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
