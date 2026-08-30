@@ -8,7 +8,7 @@ use thiserror::Error;
 
 pub const GENESIS_RECEIPT_REF: &str = "genesis";
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainEntry {
     pub sequence: u64,
     pub event: MuefEvent,
@@ -25,8 +25,8 @@ pub struct ReplayState {
 
 impl ReplayState {
     /// Deterministic v0 state reducer.
-    /// If an event payload contains `state_patch`, each object key is applied
-    /// in sorted-map order. JSON null deletes the key; any other value sets it.
+    /// If an event payload contains `state_patch`, JSON null deletes a key;
+    /// any other value sets it. Only verified entries are replayed.
     pub fn apply(&mut self, entry: &ChainEntry) {
         if let Some(Value::Object(patch)) = entry.event.payload.get("state_patch") {
             for (key, value) in patch {
@@ -117,12 +117,12 @@ impl ChainLog {
                 event_json, observation_json, receipt_json
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
-                event.event_id,
-                receipt.receipt_id,
-                receipt.previous_receipt_ref,
-                event_json,
-                observation_json,
-                receipt_json,
+                &event.event_id,
+                &receipt.receipt_id,
+                &receipt.previous_receipt_ref,
+                &event_json,
+                &observation_json,
+                &receipt_json,
             ],
         )?;
 
