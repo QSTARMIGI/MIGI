@@ -21,7 +21,7 @@ fn node_a_to_node_b_is_replayable_and_verifiable() {
         let observation = serde_json::json!({
             "accepted": true,
             "executed_by": "node-b",
-            "event_id": packet.event.event_id
+            "event_id": packet.event.event_id.clone()
         });
         let receipt = issue_receipt(
             &packet.event,
