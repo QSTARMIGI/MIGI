@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .authority import LUFITGuard
+from .events import MUEFEvent
 from .models import (
     MIGIArtifact,
     MIGIExecution,
@@ -14,18 +15,22 @@ from .models import (
     MIGIReceipt,
     SourceClass,
 )
+from .replay import replay_verified_state
 from .storage import GenesisStore
 from .util import new_id, utc_now
 
 
 class GenesisNode:
-    """MIGI Genesis Node v0.1.
+    """MIGI Genesis Node.
 
-    Implements one accountable vertical slice:
+    Implements an accountable vertical slice:
     intent -> authority -> execution -> verification -> receipt -> memory -> recall.
+
+    v0.2 adds MUEF state events, deterministic replay, and a CAMbus-compatible
+    event boundary without making network receipt equivalent to authorization.
     """
 
-    VERSION = "0.1.0"
+    VERSION = "0.2.0"
 
     def __init__(self, db_path: str | Path, allowed_roots: Iterable[str | Path] | None = None):
         roots = list(allowed_roots or [Path.cwd()])
@@ -38,7 +43,13 @@ class GenesisNode:
             "service": "migi-genesis-node",
             "version": self.VERSION,
             "receipt_chain": verification,
-            "capabilities": ["artifact.inspect", "receipt.verify", "artifact.recall"],
+            "capabilities": [
+                "artifact.inspect",
+                "receipt.verify",
+                "artifact.recall",
+                "state.patch",
+                "state.replay",
+            ],
         }
 
     def inspect_artifact(
@@ -56,7 +67,7 @@ class GenesisNode:
             action="artifact.inspect",
             target_ref=str(target),
             consent_scope=consent_scope,
-            metadata={"requested_via": "genesis.v0.1"},
+            metadata={"requested_via": "genesis.v0.2"},
         )
         self.store.put("intent", intent.intent_id, intent.created_at, intent.to_dict())
 
@@ -148,6 +159,122 @@ class GenesisNode:
             "memory": memory.to_dict(),
         }
 
+    def process_muef_event(
+        self,
+        event: MUEFEvent,
+        *,
+        actor_id: str | None = None,
+        consent_scope: str = "local.state.write",
+        transport_ref: str | None = None,
+    ) -> dict[str, Any]:
+        """Process one MUEF state event through authority, receipt, and memory.
+
+        v0.2 intentionally supports only `migi.state.patch`. Receiving a CAMbus
+        packet does not authorize it; LUFITGuard evaluates the resulting intent.
+        """
+        event.validate()
+        if event.event_type != "migi.state.patch":
+            raise ValueError("Genesis v0.2 only executes migi.state.patch events")
+        patch = event.payload.get("state_patch")
+        if not isinstance(patch, dict):
+            raise ValueError("migi.state.patch requires an object payload.state_patch")
+
+        self.store.put("muef_event", event.event_id, event.occurred_at, event.to_dict())
+
+        intent = MIGIIntent(
+            intent_id=new_id("intent"),
+            created_at=utc_now(),
+            actor_id=actor_id or event.actor.id,
+            action="state.patch",
+            target_ref=f"state:{event.event_id}",
+            consent_scope=consent_scope,
+            metadata={
+                "requested_via": "cambus" if transport_ref else "genesis.local",
+                "muef_event_ref": event.event_id,
+                **({"transport_ref": transport_ref} if transport_ref else {}),
+            },
+        )
+        self.store.put("intent", intent.intent_id, intent.created_at, intent.to_dict())
+
+        decision = self.guard.evaluate(intent)
+        authority = decision.authority
+        self.store.put("authority", authority.authority_id, authority.decided_at, authority.to_dict())
+
+        if not decision.allowed:
+            return self._record_event_non_execution(event, intent, authority, transport_ref)
+
+        started_at = utc_now()
+        execution = MIGIExecution(
+            execution_id=new_id("exec"),
+            started_at=started_at,
+            completed_at=utc_now(),
+            intent_id=intent.intent_id,
+            authority_id=authority.authority_id,
+            executor="migi.genesis.state_patch",
+            operation="state.patch",
+            success=True,
+            output={
+                "event_id": event.event_id,
+                "applied_keys": sorted(str(key) for key in patch),
+                "deleted_keys": sorted(str(key) for key, value in patch.items() if value is None),
+            },
+            verification={
+                "event_valid": True,
+                "state_patch_object": True,
+                "authority_allowed": True,
+            },
+        )
+        self.store.put("execution", execution.execution_id, execution.completed_at, execution.to_dict())
+
+        receipt_metadata: dict[str, Any] = {
+            "execution_ref": execution.execution_id,
+            "executor": execution.executor,
+            "event_type": event.event_type,
+            "verified": True,
+        }
+        if transport_ref:
+            receipt_metadata["transport_ref"] = transport_ref
+
+        receipt = self._make_receipt(
+            intent=intent,
+            authority=authority,
+            event_id=event.event_id,
+            source_class=SourceClass.EXECUTED.value,
+            output_ref=event.event_id,
+            metadata=receipt_metadata,
+        )
+        receipt_hash = self.store.append_receipt(receipt)
+
+        memory = MIGIMemory(
+            memory_id=new_id("memory"),
+            created_at=utc_now(),
+            subject_ref=event.event_id,
+            receipt_id=receipt.receipt_id,
+            kind="migi.state.patch.completed",
+            summary=f"Applied verified state patch with {len(patch)} key(s).",
+            facts={
+                "event_ref": event.event_id,
+                "execution_ref": execution.execution_id,
+                "authority_ref": authority.authority_id,
+                "transport_ref": transport_ref,
+            },
+        )
+        self.store.put("memory", memory.memory_id, memory.created_at, memory.to_dict())
+
+        return {
+            "event": event.to_dict(),
+            "intent": intent.to_dict(),
+            "authority": authority.to_dict(),
+            "execution": execution.to_dict(),
+            "receipt": receipt.to_dict(),
+            "receipt_hash": receipt_hash,
+            "memory": memory.to_dict(),
+            "replay": self.replay_state(),
+        }
+
+    def replay_state(self) -> dict[str, Any]:
+        return replay_verified_state(self.store).to_dict()
+
     def recall_artifact(self, reference: str) -> dict[str, Any] | None:
         artifact = self._find_artifact(reference)
         if artifact is None:
@@ -215,6 +342,45 @@ class GenesisNode:
             "receipt": receipt.to_dict(),
             "receipt_hash": receipt_hash,
             "memory": memory.to_dict(),
+        }
+
+    def _record_event_non_execution(self, event: MUEFEvent, intent: MIGIIntent, authority, transport_ref: str | None) -> dict[str, Any]:
+        metadata: dict[str, Any] = {"executed": False, "event_type": event.event_type}
+        if transport_ref:
+            metadata["transport_ref"] = transport_ref
+        receipt = self._make_receipt(
+            intent=intent,
+            authority=authority,
+            event_id=event.event_id,
+            source_class=SourceClass.PROPOSED.value,
+            output_ref=event.event_id,
+            metadata=metadata,
+        )
+        receipt_hash = self.store.append_receipt(receipt)
+        memory = MIGIMemory(
+            memory_id=new_id("memory"),
+            created_at=utc_now(),
+            subject_ref=event.event_id,
+            receipt_id=receipt.receipt_id,
+            kind="migi.state.patch.not_executed",
+            summary=f"State patch did not execute: {authority.reason_code}.",
+            facts={
+                "tre_logic": authority.tre_logic,
+                "reason_code": authority.reason_code,
+                "event_ref": event.event_id,
+                "transport_ref": transport_ref,
+            },
+        )
+        self.store.put("memory", memory.memory_id, memory.created_at, memory.to_dict())
+        return {
+            "event": event.to_dict(),
+            "intent": intent.to_dict(),
+            "authority": authority.to_dict(),
+            "execution": None,
+            "receipt": receipt.to_dict(),
+            "receipt_hash": receipt_hash,
+            "memory": memory.to_dict(),
+            "replay": self.replay_state(),
         }
 
     def _make_receipt(
