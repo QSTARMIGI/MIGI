@@ -4,5 +4,6 @@ members = [
     "crates/migi-recall",
     "crates/migi-chainlog",
     "crates/migi-cambus",
+    "crates/migi-epistemics",
 ]
 resolver = "2"

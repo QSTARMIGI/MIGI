@@ -106,6 +106,8 @@ pub enum CoreError {
     InvalidSchemaVersion,
     #[error("event_type must match the lowercase namespaced MUEF form, e.g. migi.signal.test")]
     InvalidEventType,
+    #[error("executed receipts require Tre Logic +1 / Proceed authority")]
+    ExecutionNotAuthorized,
 }
 
 pub fn validate_event(event: &MuefEvent) -> Result<(), CoreError> {
@@ -139,6 +141,10 @@ pub fn issue_receipt(
     previous_receipt_ref: impl Into<String>,
 ) -> Result<MigiReceipt, CoreError> {
     validate_event(event)?;
+    if authority.tre_logic != TreLogic::Proceed {
+        return Err(CoreError::ExecutionNotAuthorized);
+    }
+
     let input_hash = sha256_json(event);
     let output_hash = sha256_json(output);
     let mut metadata = serde_json::Map::new();
@@ -189,6 +195,22 @@ mod tests {
         assert!(receipt.output_ref.starts_with("sha256:"));
         assert!(receipt.metadata["input_hash"].as_str().unwrap().starts_with("sha256:"));
         assert_eq!(receipt.previous_receipt_ref, "genesis");
+    }
+
+    #[test]
+    fn receipt_rejects_hold_and_deny_authority() {
+        let event = MuefEvent::new("migi.signal.test", actor(), SourceClass::Original);
+        let output = serde_json::json!({"message": "must-not-execute"});
+
+        for tre_logic in [TreLogic::Hold, TreLogic::Deny] {
+            let authority = Authority {
+                tre_logic,
+                reason_code: "not_authorized".into(),
+                consent_scope: None,
+            };
+            let error = issue_receipt(&event, authority, &output, "genesis").unwrap_err();
+            assert!(matches!(error, CoreError::ExecutionNotAuthorized));
+        }
     }
 
     #[test]
