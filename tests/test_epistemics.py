@@ -53,6 +53,21 @@ class EpistemicsTests(unittest.TestCase):
         result = evaluate_evidence([], threshold=0.60)
         self.assertEqual(result.state, EvidenceState.UNRESOLVED.value)
         self.assertAlmostEqual(result.uncertainty, 1.0)
+        self.assertEqual(result.evidence_weight, 0.0)
+        self.assertEqual(result.evidence_strength, 0.0)
+
+    def test_arbitrarily_weak_evidence_remains_unresolved(self):
+        result = evaluate_evidence(
+            [EvidenceItem(1.0, 1e-10, 1.0, 1.0)],
+            threshold=0.60,
+        )
+
+        self.assertEqual(result.state, EvidenceState.UNRESOLVED.value)
+        self.assertAlmostEqual(result.evidence_weight, 1e-10)
+        self.assertAlmostEqual(result.evidence_strength, 1e-10)
+        self.assertLess(result.support_score, 0.60)
+        self.assertLess(result.confidence, 0.34)
+        self.assertGreater(result.uncertainty, 0.99)
 
     def test_observation_to_receipt_to_recall_to_qualified_claim(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -80,7 +95,9 @@ class EpistemicsTests(unittest.TestCase):
 
             self.assertEqual(result["authority"]["tre_logic"], "+1")
             self.assertEqual(result["execution"]["output"]["qualification"], "supported")
+            self.assertTrue(result["execution"]["verification"]["factual_claim_verified"])
             self.assertEqual(result["receipt"]["source_class"], SourceClass.DERIVED.value)
+            self.assertTrue(result["receipt"]["metadata"]["verified"])
             self.assertTrue(result["chain"]["valid"])
             self.assertEqual(result["chain"]["checked"], 1)
 
@@ -113,6 +130,43 @@ class EpistemicsTests(unittest.TestCase):
 
             self.assertEqual(result["execution"]["output"]["qualification"], "simulation_only")
             self.assertTrue(result["execution"]["verification"]["simulation_preserved"])
+            self.assertFalse(result["execution"]["verification"]["factual_claim_verified"])
+            self.assertFalse(result["receipt"]["metadata"]["verified"])
+
+    def test_simulation_classification_is_preserved_when_out_of_profile(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _, runtime = self._runtime(root)
+            profile = LUFITProfile.create(
+                resolution_level=1.0,
+                budget_units=1,
+                observables=[],
+                methods=[],
+                cutoff=0.0,
+            )
+            result = runtime.qualify_claim(
+                "sim.out.of.profile",
+                state_before={"mode": "simulation"},
+                state_after={"mode": "simulation_complete"},
+                observation=SFOObservation(
+                    source_id="physics-sim",
+                    source_class=SourceClass.SIMULATED.value,
+                    value={"temperature_c": 103.0},
+                    confidence=1.0,
+                    provenance_ref="sim:run:out-of-profile",
+                ),
+                evidence=[EvidenceItem(1.0, 1.0, 1.0, 1.0)],
+                profile=profile,
+                requirements=self._requirements(),
+            )
+
+            output = result["execution"]["output"]
+            self.assertEqual(output["qualification"], "simulation_only")
+            self.assertEqual(output["profile"]["status"], "out_of_profile")
+            self.assertTrue(result["execution"]["success"])
+            self.assertTrue(result["execution"]["verification"]["simulation_preserved"])
+            self.assertFalse(result["execution"]["verification"]["factual_claim_verified"])
+            self.assertFalse(result["receipt"]["metadata"]["verified"])
 
     def test_out_of_profile_claim_is_explicitly_refused(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -151,6 +205,8 @@ class EpistemicsTests(unittest.TestCase):
             self.assertEqual(output["qualification"], "out_of_profile")
             self.assertEqual(output["profile"]["status"], "out_of_profile")
             self.assertEqual(len(output["profile"]["violations"]), 5)
+            self.assertFalse(result["execution"]["verification"]["factual_claim_verified"])
+            self.assertFalse(result["receipt"]["metadata"]["verified"])
 
     def test_reasoning_without_explicit_scope_holds_and_does_not_execute(self):
         with tempfile.TemporaryDirectory() as temp_dir:

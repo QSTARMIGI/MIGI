@@ -57,6 +57,20 @@ Weighted mass is normalized into:
 [contradicted, unresolved, supported]
 ```
 
+Directional normalization alone would allow an arbitrarily weak source to look
+perfectly supportive or contradictory. The runtime therefore preserves absolute
+evidence strength. One unit of total weight is the default full-strength reference:
+
+```text
+strength = min(total_evidence_weight / reference_weight, 1)
+P(final) = strength × P(directional) + (1 - strength) × [1/3, 1/3, 1/3]
+```
+
+Sub-reference evidence is blended toward uniform ignorance. A source with near-zero
+confidence therefore remains unresolved instead of becoming factual support merely
+because no competing evidence was supplied. Both `evidence_weight` and
+`evidence_strength` are included in the assessment for audit and calibration.
+
 Net support:
 
 ```text
@@ -94,6 +108,15 @@ Even if the simulated result has strong evidence weights, its factual qualificat
 ```text
 simulation_only
 ```
+
+This classification takes precedence over profile rejection. Profile violations are
+still retained separately, so a simulated, out-of-profile result is represented as
+`simulation_only` with an `out_of_profile` profile status. Its derived receipt is not
+marked as factually verified.
+
+`execution.success` means the qualification operation completed. Receipt metadata
+`verified` and execution verification `factual_claim_verified` are true only when an
+in-profile, non-simulated factual claim is supported.
 
 A later real observation can be compared against that prediction in a separate SFO cycle.
 
@@ -134,11 +157,13 @@ The weights are a benchmarkable starting point, not an assertion that they are o
 The automated suite proves:
 
 1. no evidence returns unresolved;
-2. a supported observed claim produces a derived receipt and can be recalled;
-3. simulation remains `simulation_only`;
-4. an out-of-profile claim is explicitly labeled;
-5. missing reasoning authority produces Hold (`0`) and no execution;
-6. provenance-aware RAG0SHOT ranking can prefer a trustworthy result over a superficially more similar result.
+2. arbitrarily weak evidence remains unresolved;
+3. a supported observed claim produces a factually verified derived receipt and can be recalled;
+4. simulation remains `simulation_only`, including when it is out of profile;
+5. simulation-only and out-of-profile receipts are not marked as factually verified;
+6. an out-of-profile claim is explicitly labeled;
+7. missing reasoning authority produces Hold (`0`) and no execution;
+8. provenance-aware RAG0SHOT ranking can prefer a trustworthy result over a superficially more similar result.
 
 ## Next benchmark
 

@@ -53,6 +53,8 @@ class EvidenceAssessment:
     support_score: float
     confidence: float
     uncertainty: float
+    evidence_weight: float
+    evidence_strength: float
     probabilities: tuple[float, float, float]
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,6 +63,8 @@ class EvidenceAssessment:
             "support_score": self.support_score,
             "confidence": self.confidence,
             "uncertainty": self.uncertainty,
+            "evidence_weight": self.evidence_weight,
+            "evidence_strength": self.evidence_strength,
             "probabilities": {
                 "contradicted": self.probabilities[0],
                 "unresolved": self.probabilities[1],
@@ -191,9 +195,16 @@ class RetrievalSignals:
                 raise ValueError(f"retrieval signal {name} must be finite and in [0, 1]")
 
 
-def evaluate_evidence(evidence: Iterable[EvidenceItem], *, threshold: float = 0.60) -> EvidenceAssessment:
+def evaluate_evidence(
+    evidence: Iterable[EvidenceItem],
+    *,
+    threshold: float = 0.60,
+    reference_weight: float = 1.0,
+) -> EvidenceAssessment:
     if not _unit_interval(threshold):
         raise ValueError("evidence threshold must be finite and in [0, 1]")
+    if not math.isfinite(reference_weight) or reference_weight <= 0.0:
+        raise ValueError("evidence reference_weight must be finite and greater than zero")
 
     contradicted = 0.0
     unresolved = 0.0
@@ -206,11 +217,25 @@ def evaluate_evidence(evidence: Iterable[EvidenceItem], *, threshold: float = 0.
         contradicted += weight * max(-item.direction, 0.0)
         unresolved += weight * (1.0 - abs(item.direction))
 
-    total = contradicted + unresolved + supported
-    if total <= float.fromhex("0x1.0p-52"):
-        probabilities = (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
+    evidence_weight = contradicted + unresolved + supported
+    if evidence_weight <= float.fromhex("0x1.0p-52"):
+        directional_probabilities = (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
     else:
-        probabilities = (contradicted / total, unresolved / total, supported / total)
+        directional_probabilities = (
+            contradicted / evidence_weight,
+            unresolved / evidence_weight,
+            supported / evidence_weight,
+        )
+
+    # Normalizing directional mass alone would turn an arbitrarily weak source
+    # into perfect support or contradiction. Preserve absolute evidence strength
+    # by blending sub-reference evidence toward a uniform ignorance baseline.
+    evidence_strength = min(evidence_weight / reference_weight, 1.0)
+    ignorance = (1.0 - evidence_strength) / 3.0
+    probabilities = tuple(
+        ignorance + evidence_strength * probability
+        for probability in directional_probabilities
+    )
 
     support_score = probabilities[2] - probabilities[0]
     if support_score > threshold:
@@ -229,6 +254,8 @@ def evaluate_evidence(evidence: Iterable[EvidenceItem], *, threshold: float = 0.
         support_score=support_score,
         confidence=confidence,
         uncertainty=uncertainty,
+        evidence_weight=evidence_weight,
+        evidence_strength=evidence_strength,
         probabilities=probabilities,
     )
 
@@ -286,10 +313,10 @@ def qualify_factual_claim(
     profile_status: ProfileStatus,
     assessment: EvidenceAssessment,
 ) -> str:
-    if not profile_status.in_profile:
-        return ClaimQualification.OUT_OF_PROFILE.value
     if source_class == SourceClass.SIMULATED.value:
         return ClaimQualification.SIMULATION_ONLY.value
+    if not profile_status.in_profile:
+        return ClaimQualification.OUT_OF_PROFILE.value
     if assessment.state == EvidenceState.SUPPORTED.value:
         return ClaimQualification.SUPPORTED.value
     if assessment.state == EvidenceState.CONTRADICTED.value:

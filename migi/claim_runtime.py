@@ -75,6 +75,7 @@ class VerifiableClaimRuntime:
             profile_status=profile_status,
             assessment=assessment,
         )
+        factual_claim_verified = qualification == "supported"
         sfo = SFORecord(
             state_before=state_before,
             state_after=state_after,
@@ -107,6 +108,7 @@ class VerifiableClaimRuntime:
                     observation.source_class != SourceClass.SIMULATED.value
                     or qualification == "simulation_only"
                 ),
+                "factual_claim_verified": factual_claim_verified,
             },
         )
         self.store.put("execution", execution.execution_id, execution.completed_at, execution.to_dict())
@@ -122,7 +124,8 @@ class VerifiableClaimRuntime:
                 "qualification": qualification,
                 "observation_source_class": observation.source_class,
                 "profile_status": profile_status.to_dict()["status"],
-                "verified": True,
+                "evaluation_completed": True,
+                "verified": factual_claim_verified,
             },
         )
         receipt_hash = self.store.append_receipt(receipt)
@@ -146,6 +149,7 @@ class VerifiableClaimRuntime:
                 "confidence": assessment.confidence,
                 "uncertainty": assessment.uncertainty,
                 "profile_status": profile_status.to_dict()["status"],
+                "factual_claim_verified": factual_claim_verified,
                 "execution_ref": execution.execution_id,
                 "authority_ref": authority.authority_id,
             },
