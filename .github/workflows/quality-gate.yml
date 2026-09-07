@@ -26,6 +26,7 @@ jobs:
           test -f docs/architecture/internal-operating-projects.md
           test -f docs/architecture/repository-roles.md
           test -f docs/architecture/genesis-node-v0.1.md
+          test -f docs/architecture/lufit-sfo-verifiable-core.md
           test -f docs/roadmap/mirror-seed-mvp.md
           test -f docs/adr/README.md
           test -f provenance/dependencies.yaml
@@ -33,7 +34,12 @@ jobs:
           test -f schemas/migi-receipt.v0.json
           test -f pyproject.toml
           test -f migi/genesis.py
+          test -f migi/epistemics.py
+          test -f migi/claim_runtime.py
+          test -f benchmarks/migi_cs_002_benchmark.py
           test -f tests/test_genesis.py
+          test -f tests/test_epistemics.py
+          test -f tests/test_migi_cs_002_benchmark.py
       - name: Validate JSON schemas parse
         run: |
           python -m json.tool schemas/muef-event.v0.json >/dev/null
@@ -41,3 +47,6 @@ jobs:
       - name: Run Genesis Node tests
         run: |
           PYTHONPATH=. python -W error::ResourceWarning -m unittest discover -s tests -v
+      - name: Run MIGI-CS-002 benchmark
+        run: |
+          PYTHONPATH=. python benchmarks/migi_cs_002_benchmark.py --json | tee migi-cs-002-benchmark.json
