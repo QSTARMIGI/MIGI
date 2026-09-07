@@ -20,15 +20,16 @@ class AuthorityDecision:
 class LUFITGuard:
     """Minimal Genesis policy gate.
 
-    v0.2 keeps the original read-only artifact inspection policy and adds one
-    tightly scoped state transition: `state.patch` with explicit local write
-    consent and a synthetic `state:` target. Network transport never grants
-    authority by itself.
+    v0.3 keeps artifact inspection and state-patch authority separate from
+    epistemic claim qualification. Claim reasoning requires its own explicit
+    local reasoning scope; network transport or a valid receipt never grants
+    write or reasoning authority by itself.
     """
 
-    ALLOWED_ACTIONS = {"artifact.inspect", "state.patch"}
+    ALLOWED_ACTIONS = {"artifact.inspect", "state.patch", "claim.qualify"}
     ARTIFACT_SCOPES = {"local.read", "private.local.read"}
     STATE_SCOPES = {"local.state.write", "private.local.state.write"}
+    CLAIM_SCOPES = {"local.reason", "private.local.reason"}
 
     def __init__(self, allowed_roots: Iterable[Path]):
         roots = [Path(root).expanduser().resolve() for root in allowed_roots]
@@ -44,6 +45,8 @@ class LUFITGuard:
             return self._evaluate_artifact_inspect(intent)
         if intent.action == "state.patch":
             return self._evaluate_state_patch(intent)
+        if intent.action == "claim.qualify":
+            return self._evaluate_claim_qualify(intent)
 
         return self._decision(intent, TreLogic.DENY, "policy.action_not_allowlisted")
 
@@ -64,6 +67,13 @@ class LUFITGuard:
         if not intent.target_ref.startswith("state:"):
             return self._decision(intent, TreLogic.DENY, "policy.invalid_state_target")
         return self._decision(intent, TreLogic.ALLOW, "authority.explicit_local_state_write")
+
+    def _evaluate_claim_qualify(self, intent: MIGIIntent) -> AuthorityDecision:
+        if intent.consent_scope not in self.CLAIM_SCOPES:
+            return self._decision(intent, TreLogic.HOLD, "authority.explicit_reasoning_required")
+        if not intent.target_ref.startswith("claim:"):
+            return self._decision(intent, TreLogic.DENY, "policy.invalid_claim_target")
+        return self._decision(intent, TreLogic.ALLOW, "authority.explicit_local_reasoning")
 
     def _decision(self, intent: MIGIIntent, state: TreLogic, reason: str) -> AuthorityDecision:
         authority = MIGIAuthority(
