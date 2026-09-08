@@ -37,9 +37,11 @@ jobs:
           test -f migi/epistemics.py
           test -f migi/claim_runtime.py
           test -f benchmarks/migi_cs_002_benchmark.py
+          test -f benchmarks/migi_cs_004_real_validation.py
           test -f tests/test_genesis.py
           test -f tests/test_epistemics.py
           test -f tests/test_migi_cs_002_benchmark.py
+          test -f tests/test_migi_cs_004_real_validation.py
       - name: Validate JSON schemas parse
         run: |
           python -m json.tool schemas/muef-event.v0.json >/dev/null
@@ -50,3 +52,6 @@ jobs:
       - name: Run MIGI-CS-002 benchmark
         run: |
           PYTHONPATH=. python benchmarks/migi_cs_002_benchmark.py --json | tee migi-cs-002-benchmark.json
+      - name: Run MIGI-CS-004 repository validation
+        run: |
+          PYTHONPATH=. python benchmarks/migi_cs_004_real_validation.py --json | tee migi-cs-004-real-validation.json
