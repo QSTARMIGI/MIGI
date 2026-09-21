@@ -108,6 +108,22 @@ PYTHONPATH=. python -m unittest discover -s tests -v
 
 Genesis v0.1 provides SHA-256 hash-chain integrity. Device identity signatures are deliberately deferred to the Android Keystore-backed MIRROR SEED milestone rather than being implied by the current code.
 
+## MIRROR SEED MS-001 offline core
+
+The selected-file capture → authorized UTF-8 text analysis → selected-history
+export loop is available through the CLI. Original bytes are preserved in
+SQLite; bundles can be verified without the source database. Scopes are explicit
+and original bytes are excluded from export unless selected.
+
+```bash
+PYTHONPATH=. python examples/mirror_seed_demo.py --output .migi/mirror-demo.json
+python -m migi.cli mirror-verify .migi/mirror-demo.json
+```
+
+See [MS-001 contract and phone milestone](docs/architecture/mirror-seed-ms001.md).
+This is the offline Python core; native phone capture, UI, and device signatures
+remain pending.
+
 ## Repository Status
 
 This repository is the canonical architecture and implementation home for MIGI core. Documentation describes intended system behavior and boundaries; it does not claim that every described module is already implemented or production-ready.
