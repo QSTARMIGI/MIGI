@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import replace
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from .canonical import chained_hash
+from .canonical import canonical_json_bytes, chained_hash, sha256_hex
 from .models import MIGIReceipt
 
 
@@ -53,6 +54,11 @@ class GenesisStore:
                     previous_receipt_hash TEXT NOT NULL,
                     payload_json TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS artifact_bytes (
+                    sha256 TEXT PRIMARY KEY,
+                    data BLOB NOT NULL
+                );
                 """
             )
 
@@ -74,6 +80,40 @@ class GenesisStore:
             return None
         return {"kind": row["kind"], **json.loads(row["payload_json"])}
 
+    def commit_operation(self, receipt: MIGIReceipt, objects: list[tuple[str, str, str, dict]],
+                         blobs: list[bytes] | None = None) -> tuple[MIGIReceipt, str]:
+        """Atomically commit one MIRROR SEED operation and its current chain link.
+
+        A failed object insert rolls back bytes, objects, and receipt together.
+        BEGIN IMMEDIATE serializes head selection with other writers.
+        """
+        with self._session() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT receipt_hash FROM receipt_chain ORDER BY sequence DESC LIMIT 1").fetchone()
+            previous = "" if row is None else row["receipt_hash"]
+            receipt = replace(receipt, previous_receipt_ref=previous)
+            payload = receipt.to_dict()
+            receipt_hash = chained_hash(previous, payload)
+            for data in blobs or []:
+                digest = sha256_hex(data)
+                row = conn.execute("SELECT data FROM artifact_bytes WHERE sha256 = ?", (digest,)).fetchone()
+                if row is not None and bytes(row["data"]) != data:
+                    raise ValueError("stored_bytes_mismatch")
+                conn.execute("INSERT OR IGNORE INTO artifact_bytes VALUES (?, ?)", (digest, data))
+            for kind, object_id, created_at, obj in objects:
+                conn.execute("INSERT INTO objects VALUES (?, ?, ?, ?)",
+                             (kind, object_id, created_at, canonical_json_bytes(obj).decode("utf-8")))
+            conn.execute("INSERT INTO receipt_chain(receipt_id, receipt_hash, previous_receipt_hash, payload_json) VALUES (?, ?, ?, ?)",
+                         (receipt.receipt_id, receipt_hash, previous, canonical_json_bytes(payload).decode("utf-8")))
+        return receipt, receipt_hash
+
+    def artifact_data(self, digest: str) -> bytes:
+        with self._session() as conn:
+            row = conn.execute("SELECT data FROM artifact_bytes WHERE sha256 = ?", (digest,)).fetchone()
+        if row is None or sha256_hex(bytes(row["data"])) != digest:
+            raise ValueError("stored_bytes_missing_or_modified")
+        return bytes(row["data"])
+
     def list_kind(self, kind: str) -> list[dict[str, Any]]:
         with self._session() as conn:
             rows = conn.execute(
@@ -91,12 +131,14 @@ class GenesisStore:
 
     def append_receipt(self, receipt: MIGIReceipt) -> str:
         payload = receipt.to_dict()
-        previous = self.latest_receipt_hash()
-        if payload["previous_receipt_ref"] != previous:
-            raise ValueError("Receipt previous_receipt_ref does not match current chain head")
-        receipt_hash = chained_hash(previous, payload)
         encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         with self._session() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT receipt_hash FROM receipt_chain ORDER BY sequence DESC LIMIT 1").fetchone()
+            previous = "" if row is None else str(row["receipt_hash"])
+            if payload["previous_receipt_ref"] != previous:
+                raise ValueError("Receipt previous_receipt_ref does not match current chain head")
+            receipt_hash = chained_hash(previous, payload)
             conn.execute(
                 """
                 INSERT INTO receipt_chain(receipt_id, receipt_hash, previous_receipt_hash, payload_json)

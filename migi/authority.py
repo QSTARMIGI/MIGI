@@ -26,7 +26,7 @@ class LUFITGuard:
     write or reasoning authority by itself.
     """
 
-    ALLOWED_ACTIONS = {"artifact.inspect", "state.patch", "claim.qualify"}
+    ALLOWED_ACTIONS = {"artifact.inspect", "state.patch", "claim.qualify", "artifact.capture", "artifact.derive", "artifact.export"}
     ARTIFACT_SCOPES = {"local.read", "private.local.read"}
     STATE_SCOPES = {"local.state.write", "private.local.state.write"}
     CLAIM_SCOPES = {"local.reason", "private.local.reason"}
@@ -47,6 +47,19 @@ class LUFITGuard:
             return self._evaluate_state_patch(intent)
         if intent.action == "claim.qualify":
             return self._evaluate_claim_qualify(intent)
+        if intent.action.startswith("artifact."):
+            scope = {"artifact.capture": "local.capture", "artifact.derive": "local.analyze", "artifact.export": "local.export"}[intent.action]
+            if intent.consent_scope != scope:
+                return self._decision(intent, TreLogic.HOLD, "authority.explicit_consent_required")
+            if intent.action == "artifact.capture":
+                target = Path(intent.target_ref).expanduser().resolve()
+                if not any(_is_within(target, root) for root in self.allowed_roots):
+                    return self._decision(intent, TreLogic.DENY, "policy.target_outside_allowed_root")
+                if not target.is_file():
+                    return self._decision(intent, TreLogic.HOLD, "target.file_not_available")
+            elif not intent.target_ref.startswith("artifact:"):
+                return self._decision(intent, TreLogic.DENY, "policy.invalid_artifact_target")
+            return self._decision(intent, TreLogic.ALLOW, "authority.explicit_" + scope.replace(".", "_"))
 
         return self._decision(intent, TreLogic.DENY, "policy.action_not_allowlisted")
 

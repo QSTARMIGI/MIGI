@@ -2,6 +2,15 @@
 
 **Product goal:** A mobile edge application that captures an authorized observation, preserves the original, creates a receipt, runs approved analysis, labels derivative output, and shows a human-readable history.
 
+## Current implementation checkpoint
+
+Genesis and the later core PRs implement the local receipt-chain, Tre Logic,
+authority, event, and recall foundations. MS-001 now adds preserved selected-file
+capture, an explicitly authorized text-analysis adapter, verified lineage, and
+consent-selected offline export. See [MS-001](../architecture/mirror-seed-ms001.md)
+for commands, limits, and tests. This checkpoint does not imply completion of
+native capture, device signing, encrypted storage, or UI acceptance below.
+
 ## Non-Goals for the First MVP
 
 The MVP does **not** attempt to deliver:
@@ -28,11 +37,11 @@ The MVP does **not** attempt to deliver:
 
 ## Milestone 0 — Foundation
 
-- [ ] Define a versioned MUEF envelope.
-- [ ] Define `MIGIReceipt` JSON schema.
-- [ ] Implement a local SQLite ChainLog with a genesis hash.
-- [ ] Implement `+1 / 0 / -1` Tre Logic result model with reason codes.
-- [ ] Define source classes: `original`, `observed`, `derived`, `simulated`, `proposed`, `authorized`, `executed`.
+- [x] Define a versioned MUEF envelope.
+- [x] Define `MIGIReceipt` JSON schema.
+- [x] Implement a local SQLite ChainLog with a genesis hash.
+- [x] Implement `+1 / 0 / -1` Tre Logic result model with reason codes.
+- [x] Define source classes: `original`, `observed`, `derived`, `simulated`, `proposed`, `authorized`, `executed`.
 - [ ] Add unit tests for canonical serialization and hash chaining.
 
 **Acceptance:** A local CLI or API can append and verify a chain of receipts.
