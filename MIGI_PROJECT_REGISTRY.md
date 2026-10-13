@@ -32,15 +32,16 @@ This registry separates verified repository facts from intended architecture, ex
 | Product path in README | MIRROR SEED: trusted capture, local provenance, approved analysis, human approval, and replayable receipt trail |
 | Rust workspace at repository root | Not found at `Cargo.toml` during this audit; do not assume a Rust workspace is present at root |
 | `MIGI_CANON.md` / `CHANGELOG.md` at repository root | Not found during this audit; canonical positioning exists in project context, but these exact root files are not verified |
-| Automated CI workflow status | Not yet audited |
+| Automated CI workflow | `.github/workflows/quality-gate.yml` exists; runs required-file checks, JSON schema parsing, unit tests, and CS-002/CS-004 benchmark scripts |
 | Release tags and branch protection | Not yet audited |
-| Dependency lockfile / reproducible install | Not yet audited |
+| Dependency lockfile / reproducible install | `pyproject.toml` defines Python >=3.11 and optional API dependencies; no lockfile was confirmed in this pass. Local test reproduction is blocked because the audit runtime cannot resolve github.com; CI evidence is available for the two open PR heads below. |
 
 ## Known development branches
 
 The GitHub branch search returned these branches at audit time:
 
 - `main`
+- `docs/version-control-audit-v1` (audit documentation branch; PR #16)
 - `feat/genesis-cambus-replay`
 - `feat/genesis-code-recall-api`
 - `feat/migi-cs-001-verifiable-signal-loop`
@@ -56,18 +57,26 @@ A branch existing does not mean its changes are merged or current. Compare each 
 
 ## Pull-request evidence
 
-| PR | Scope | Audit note |
-|---|---|---|
-| [#8](https://github.com/QSTARMIGI/MIGI/pull/8) | Genesis Node v0.1 | Previously recorded as merged; re-check merge state during the full PR audit |
-| [#9](https://github.com/QSTARMIGI/MIGI/pull/9) | Genesis CAMbus and deterministic replay | Previously recorded as merged; re-check merge state during the full PR audit |
-| [#10](https://github.com/QSTARMIGI/MIGI/pull/10) | RAG0SHOT code memory v0.2 | Previously recorded as merged; re-check merge state during the full PR audit |
-| [#11](https://github.com/QSTARMIGI/MIGI/pull/11) | Genesis code-recall API | Previously recorded as merged; re-check merge state during the full PR audit |
-| [#12](https://github.com/QSTARMIGI/MIGI/pull/12) | LUFIT + SFO verifiable claim core | Previously recorded as merged; re-check merge state during the full PR audit |
-| [#13](https://github.com/QSTARMIGI/MIGI/pull/13) | 1,000-case synthetic benchmark | Review status and merge state require explicit verification |
-| [#14](https://github.com/QSTARMIGI/MIGI/pull/14) | Repository-grounded retrieval and noisy-evidence validation | Review status and merge state require explicit verification |
-| [#15](https://github.com/QSTARMIGI/MIGI/pull/15) | MIRROR SEED MS-001 offline capture, authorized analysis, portable export | Identified as a draft PR in the inspected PR description; do not count as released |
+Current PR metadata was fetched directly from GitHub on 2026-10-13.
 
-Historical merge descriptions above are carried forward from prior project records and are marked for re-verification. PR descriptions and test counts are claims about a proposed revision until independently reproduced on the exact commit.
+| PR | Scope | Verified state |
+|---|---|---|
+| [#7](https://github.com/QSTARMIGI/MIGI/pull/7) | MIGI-CS-001 verifiable core + RAG0SHOT | Closed, **not merged**; 2,019 additions across 18 files. Treat as superseded/archival candidate, but reconcile its unique changes before archiving. |
+| [#8](https://github.com/QSTARMIGI/MIGI/pull/8) | Genesis Node v0.1 | Merged 2026-08-29 |
+| [#9](https://github.com/QSTARMIGI/MIGI/pull/9) | Genesis CAMbus and deterministic replay | Merged 2026-08-30 |
+| [#10](https://github.com/QSTARMIGI/MIGI/pull/10) | RAG0SHOT code memory v0.2 | Merged 2026-08-30 |
+| [#11](https://github.com/QSTARMIGI/MIGI/pull/11) | Genesis code-recall API | Merged 2026-08-30 |
+| [#12](https://github.com/QSTARMIGI/MIGI/pull/12) | LUFIT + SFO verifiable claim core | Merged 2026-09-07 |
+| [#13](https://github.com/QSTARMIGI/MIGI/pull/13) | 1,000-case synthetic benchmark | Merged 2026-09-08 |
+| [#14](https://github.com/QSTARMIGI/MIGI/pull/14) | Repository-grounded retrieval and noisy-evidence validation | Merged 2026-09-08 |
+| [#15](https://github.com/QSTARMIGI/MIGI/pull/15) | MIRROR SEED MS-001 offline capture, authorized analysis, portable export | Open draft; 792 additions, 11 deletions, 9 files. Quality Gate reported success for head `f1140ae55aeef14062ea5c2b171a86162adb3487`; not merged or released. |
+| [#16](https://github.com/QSTARMIGI/MIGI/pull/16) | Project registry and version-control policy | Open draft; 235 additions, 0 deletions, 2 files. Quality Gate reported success for head `e569c6c575acc13d79a8ce49bc661d0ddb855357`; not merged. |
+
+### CI interpretation
+
+The workflow at `.github/workflows/quality-gate.yml` checks required repository files, parses two JSON schemas, runs the Python unittest suite with ResourceWarnings treated as errors, and runs the CS-002 and CS-004 benchmark scripts. GitHub Actions reported the workflow conclusion as `success` for the exact head commits of PR #15 and PR #16 when checked on 2026-10-13. This is CI evidence, not a local rerun by this audit. The local audit environment could not reach github.com, so local reproduction remains outstanding.
+
+PR descriptions and test claims are not substitutes for inspecting the code or acceptance boundaries. PR #15's own design documentation explicitly says the prototype's receipts are unsigned, scope strings are local consent choices rather than authentication, and native phone capture/UI/device-backed signing remain pending. Do not describe MS-001 as a shipped phone app or cryptographically authenticated capture.
 
 ## Account repository inventory snapshot
 
@@ -128,9 +137,9 @@ The snapshot also included `CyberCodeOnline`, `DreamBerd`, `ladybird`, `standard
 
 ## Immediate audit backlog
 
-- [ ] Verify exact PR merge states and compare all feature branches against `main`.
-- [ ] Inspect the full repository tree and current test/CI configuration.
-- [ ] Run tests on a pinned commit and record command, environment, result, and timestamp.
+- [x] Verify PR #7–#16 merge/open states; feature-branch content diffs against `main` still need a complete reconciliation.
+- [x] Inspect the README, Python package metadata, quality-gate workflow, PR file lists, and selected implementation/spec files; full repository tree review remains open.
+- [ ] Reproduce tests locally on a pinned commit; CI passed for PR #15 and #16 heads, but local reproduction was blocked by unavailable network access.
 - [ ] Inspect release tags, version bump rules, branch protection, and required checks.
 - [ ] Audit lockfiles and produce a reproducible install/test recipe.
 - [ ] Classify all account repositories as original, fork, mirror, experiment, archive, or unrelated.
