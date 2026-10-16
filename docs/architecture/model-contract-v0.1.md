@@ -152,3 +152,12 @@ Recommended next implementation slice:
 5. Integrate with Genesis only through existing intent/authority/receipt boundaries after reviewing their current contracts.
 
 Keep this work on a draft branch until tests pass and a maintainer reviews compatibility with existing schemas and open PRs.
+
+## 12. Prototype implementation status (2026-10-16)
+
+The draft branch now contains an initial offline Python prototype:
+
+- `migi/emoji_a_pp.py`: three-state trit mapping, versioned intent structure, canonical JSON round-trip helpers, a deliberately limited tool-input schema validator, an explicit test authority gate, a mock in-process MCP-boundary adapter, and a digest-based prototype receipt.
+- `tests/test_emoji_a_pp.py`: tests for the three core trits, 🌐 metadata separation, unsupported schema versions, non-emit rejection, denied authority, invalid tool arguments, operation/tool mismatch, and receipt provenance.
+
+**Verification status:** files have been committed to the draft branch, but the test suite has not yet been executed in a repository runtime. These tests must be run before describing the prototype as passing. The adapter is not a network MCP client and the local `AuthorityGate` is a test double, not a replacement for Genesis/LUFITGuard or production L2 authorization. The prototype receipt is a local digest record, not a signed MIGIReceipt or an append to Genesis ChainLog.
