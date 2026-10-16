@@ -104,15 +104,51 @@ A future implementation is not conformant until tests demonstrate:
 9. Altered receipt records are detected by the existing chain verifier.
 10. Secrets and prohibited input content do not leak into logs or receipts.
 
-## 10. Status and next implementation slice
 
-**Current status: PROPOSED CONTRACT.** This document alone does not establish a model router, local inference, external provider integration, provider authentication, production security, or passing conformance tests.
+## 10. Emoji A++ and MCP boundary
+
+**Status: proposed design decision; implementation not yet present.** Emoji A++ uses a three-state core trit. Network/context is metadata and MUST NOT be treated as a fourth trit value.
+
+| Symbol | Trit | Proposed core meaning | Boundary rule |
+|---|---:|---|---|
+| 🌀 | -1 | Absorb / receive input | Receiving data does not imply permission to retain, process, or forward it. |
+| ⚛️ | 0 | Observe / inspect | Observation is a typed intent, not proof that a claim is true. |
+| 💠 | +1 | Emit / propose output | Emission proposes output or an action; consequential actions still require L2 authorization. |
+
+`🌐` is a separate context flag/metadata field for network, remote-provider, or connectivity context. It is not a fourth trit and MUST NOT alter the meaning or numeric value of the three core trits. Encoding and decoding MUST preserve this separation.
+
+### MCP adapter responsibilities
+
+- MCP is a protocol boundary for discovering and invoking tools and accessing resources/prompts; it is not the Emoji A++ semantic model or MIGI's authorization system.
+- An Emoji A++ intent MUST first be parsed into a versioned, typed intermediate representation (IR). Symbol parsing, trit validation, and schema validation happen before MCP routing.
+- An MCP client adapter MAY discover candidate tools, but tool descriptions and tool results are untrusted input. Discovery does not authorize invocation.
+- Before a tool call, the request MUST pass provider/tool eligibility and L2 policy checks for operation, target, arguments, data classification, consent, and risk.
+- The adapter MUST validate arguments against the discovered tool schema, enforce deadlines/cancellation, and return a normalized result or typed failure. No model-generated free text may be executed as code.
+- The runtime MUST record permitted provenance references for the originating intent, selected server/tool, policy decision, result digest, and receipt. Sensitive content and credentials must not enter ordinary logs.
+- MCP tools, resources, and prompts MUST be represented as distinct capability types in the IR; a prompt or resource read must not be silently converted into a tool invocation.
+
+### Initial conformance tests for Emoji A++ / MCP
+
+1. Only 🌀, ⚛️, and 💠 map to core trit values (-1, 0, +1).
+2. 🌐 is parsed as metadata and is rejected if supplied as a core trit value.
+3. Encode/decode round trips preserve trit values and context metadata independently.
+4. Unknown symbols, malformed sequences, and unsupported schema versions fail closed.
+5. MCP tool discovery alone never authorizes a call.
+6. A denied or held L2 decision results in zero MCP tool invocations.
+7. Tool arguments that fail schema validation are not sent.
+8. MCP timeout, cancellation, unavailable server, and malformed result become typed failures without unauthorized fallback.
+9. Tool results remain distinguishable from original observations and model-generated interpretations.
+10. The resulting receipt links the intent, policy decision, tool identity, and verified outcome where available.
+
+## 11. Status and next implementation slice
+
+**Current status: PROPOSED CONTRACT.** This document alone does not establish a model router, MCP client/server integration, local inference, external provider integration, production security, or passing conformance tests.
 
 Recommended next implementation slice:
-1. Add versioned Python dataclasses or equivalent typed models for request and proposal envelopes.
-2. Add a provider protocol and deterministic mock-local/mock-external adapters (no network calls).
-3. Add schema validation and routing eligibility checks.
-4. Add conformance tests for privacy, failure, and authority boundaries.
+1. Add versioned Python dataclasses or equivalent typed models for request and proposal envelopes and Emoji A++ IR.
+2. Add deterministic mock model and mock MCP tool adapters (no network calls).
+3. Add schema validation and provider/tool eligibility checks.
+4. Add conformance tests for trit/context separation, privacy, failure, and authority boundaries.
 5. Integrate with Genesis only through existing intent/authority/receipt boundaries after reviewing their current contracts.
 
 Keep this work on a draft branch until tests pass and a maintainer reviews compatibility with existing schemas and open PRs.
