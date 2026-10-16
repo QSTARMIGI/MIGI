@@ -85,7 +85,7 @@ class EmojiIntent:
     def from_dict(cls, payload: Mapping[str, Any]) -> "EmojiIntent":
         if not isinstance(payload, Mapping):
             raise AdapterError("intent must be an object")
-        allowed = {"schema_version", "intent_id", "symbol", "operation", "target", "context"}
+        allowed = {"schema_version", "intent_id", "symbol", "trit", "operation", "target", "context"}
         extra = set(payload) - allowed
         if extra:
             raise AdapterError(f"unknown intent fields: {sorted(extra)}")
@@ -101,6 +101,8 @@ class EmojiIntent:
         except KeyError as exc:
             raise AdapterError(f"missing required intent field: {exc.args[0]}") from exc
         intent.validate()
+        if "trit" in payload and payload["trit"] != int(intent.trit):
+            raise AdapterError("trit value does not match its core symbol")
         return intent
 
 
