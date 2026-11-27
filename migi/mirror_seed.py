@@ -14,6 +14,7 @@ from typing import Any
 from .canonical import canonical_json_bytes, chained_hash, sha256_hex
 from .genesis import GenesisNode
 from .models import MIGIExecution, MIGIIntent, MIGIMemory, MIGIReceipt
+from .operations import OperationObject, stage_operation
 from .util import new_id, utc_now
 
 MAX_CAPTURE_BYTES = 8 * 1024 * 1024
@@ -90,7 +91,13 @@ class MirrorSeed:
             objects.append(("execution", execution.execution_id, now, execution.to_dict()))
         if artifact:
             objects.append(("mirror_artifact", artifact["artifact_id"], now, artifact))
-        receipt, digest = self.store.commit_operation(receipt, objects, [data] if data is not None else [])
+        operation = stage_operation(
+            receipt,
+            [OperationObject(kind, object_id, created_at, payload)
+             for kind, object_id, created_at, payload in objects],
+            blobs=[data] if data is not None else [],
+        )
+        receipt, digest = operation.commit(self.store)
         return {"authority": authority.to_dict(), "execution": execution.to_dict() if execution else None,
                 "artifact": artifact, "receipt": receipt.to_dict(), "receipt_hash": digest}
 
