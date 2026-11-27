@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import base64
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from multiprocessing import get_context
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -15,6 +16,11 @@ from unittest.mock import patch
 
 from migi.canonical import chained_hash, sha256_hex
 from migi.mirror_seed import MirrorSeed, verify_bundle
+
+
+def _capture_in_separate_process(db_path: str, root: str, path: str):
+    mirror = MirrorSeed(db_path, allowed_roots=[root])
+    return mirror.capture(path, consent_scope="local.capture")
 
 
 class MirrorSeedTests(unittest.TestCase):
@@ -172,6 +178,17 @@ class MirrorSeedTests(unittest.TestCase):
         self.assertTrue(all(r["execution"]["success"] for r in results))
         self.assertEqual(self.mirror.store.verify_chain()["checked"], 8)
         self.assertTrue(self.mirror.store.verify_chain()["valid"])
+
+    def test_multiprocess_captures_serialize_receipt_head(self):
+        # The database/schema are initialized before independent processes race.
+        jobs = [(str(self.db), str(self.root), str(self.path)) for _ in range(6)]
+        with ProcessPoolExecutor(max_workers=3, mp_context=get_context("spawn")) as pool:
+            results = list(pool.map(_capture_in_separate_process, jobs))
+        self.assertTrue(all(result["execution"]["success"] for result in results))
+        chain = self.mirror.store.verify_chain()
+        self.assertTrue(chain["valid"], chain)
+        self.assertEqual(chain["checked"], 6)
+        self.assertEqual(len({result["receipt_hash"] for result in results}), 6)
 
     def test_cli_round_trip_and_standalone_verifier(self):
         def cli(*args):
