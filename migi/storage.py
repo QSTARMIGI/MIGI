@@ -12,15 +12,19 @@ from .models import MIGIReceipt
 
 
 class GenesisStore:
-    def __init__(self, db_path: str | Path):
+    def __init__(self, db_path: str | Path, *, busy_timeout_seconds: float = 30.0):
+        if busy_timeout_seconds <= 0:
+            raise ValueError("busy_timeout_seconds_must_be_positive")
         self.db_path = str(db_path)
+        self.busy_timeout_seconds = float(busy_timeout_seconds)
         Path(self.db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=self.busy_timeout_seconds)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(f"PRAGMA busy_timeout = {int(self.busy_timeout_seconds * 1000)}")
         conn.execute("PRAGMA journal_mode = WAL")
         return conn
 
@@ -30,6 +34,10 @@ class GenesisStore:
         try:
             yield conn
             conn.commit()
+        except BaseException:
+            if conn.in_transaction:
+                conn.rollback()
+            raise
         finally:
             conn.close()
 
